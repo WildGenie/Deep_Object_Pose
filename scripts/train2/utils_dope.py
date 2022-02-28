@@ -70,10 +70,7 @@ def inner_angle(v,w):
 def py_ang(A, B=(1,0)):
     inner=inner_angle(A,B)
     det = determinant(A,B)
-    if det<0: #this is a property of the det. If the det < 0 then B is clockwise of A
-        return inner
-    else: # if the det > 0 then A is immediately clockwise of B
-        return 360-inner
+    return inner if det<0 else 360-inner
 import colorsys,math
 
 def getAffinity(width,height,p1,p2,tickness=12,tensor=None,img_affinity=None):
@@ -89,7 +86,7 @@ def getAffinity(width,height,p1,p2,tickness=12,tensor=None,img_affinity=None):
 
     # create the canvas for the afinity output
     imgAffinity = Image.new("RGB", (width,height), "black")
-    draw = ImageDraw.Draw(imgAffinity)    
+    draw = ImageDraw.Draw(imgAffinity)
     draw.line([p1,p2],fill=(255/4,255/4,255/4),width=tickness)
     draw.line([p1,p2],fill=(255/2,255/2,255/2),width=2*tickness/3)
     draw.line([p1,p2],fill=(255,255,255),width=tickness/3)
@@ -99,19 +96,16 @@ def getAffinity(width,height,p1,p2,tickness=12,tensor=None,img_affinity=None):
     array = (np.array(imgAffinity)/255)[:,:,0]
     angle_vector = np.array(p2) - np.array(p1)
     angle_vector = normalize(angle_vector)
-    
+
     affinity = np.concatenate([[array*angle_vector[0]],[array*angle_vector[1]]])
     # print (tensor)
-    if not img_affinity is None:
+    if img_affinity is not None:
         # find the angle vector
         # print (angle_vector)
-        if length(angle_vector) >0:
-            angle=py_ang(angle_vector)
-        else:
-            angle = 0
+        angle = py_ang(angle_vector) if length(angle_vector) >0 else 0
         # print(angle)
         c = np.array(colorsys.hsv_to_rgb(angle/360,1,1)) * 255
-        draw = ImageDraw.Draw(img_affinity)    
+        draw = ImageDraw.Draw(img_affinity)
         draw.line([p1,p2],fill=(int(c[0]/4),int(c[1]/4),int(c[2]/4)),width=tickness)
         draw.line([p1,p2],fill=(int(c[0]/2),int(c[1]/2),int(c[2]/2)),width=2*tickness/3)
         draw.line([p1,p2],fill=(int(c[0]),int(c[1]),int(c[2])),width=tickness/3)
@@ -145,14 +139,15 @@ def loadimages(root,datastyle = "json",extensions= ['png']):
     def explore(path):
         if not os.path.isdir(path):
             return
-        folders = [os.path.join(path, o) for o in os.listdir(path) 
-                        if os.path.isdir(os.path.join(path,o))]
-        if len(folders)>0:
+        if folders := [
+            os.path.join(path, o)
+            for o in os.listdir(path)
+            if os.path.isdir(os.path.join(path, o))
+        ]:
             for path_entry in folders:
-                
-                
+
+
                 explore(path_entry)
-            # raise()
         else:
             add_json_files(path)
 
@@ -182,9 +177,9 @@ class CleanVisiiDopeLoader(data.Dataset):
         def load_data(path,extensions):
             imgs = loadimages(path,extensions = extensions)
 
-            # Check all the folders in path 
+            # Check all the folders in path
             for name in os.listdir(str(path)):
-                imgs += loadimages(path +"/"+name,extensions = extensions)
+                imgs += loadimages(f'{path}/{name}', extensions = extensions)
             return imgs
         self.imgs = []
         for path_look in path_dataset:
@@ -207,7 +202,7 @@ class CleanVisiiDopeLoader(data.Dataset):
         
         # load the data
         path_img, img_name, path_json = self.imgs[index]
-    
+
         # load the image
         # img = cv2.imread(path_img,cv2.COLOR_BGR2RGB)
         img = np.array(Image.open(path_img).convert('RGB')) 
@@ -216,12 +211,13 @@ class CleanVisiiDopeLoader(data.Dataset):
         all_projected_cuboid_keypoints = []
         with open(path_json) as f:
             data_json = json.load(f)
-        
+
         # load the projected cuboid keypoints
-        for obj in data_json['objects']:    
-            if not self.objects_interest is None and \
-                not obj['class'] in self.objects_interest\
-                :
+        for obj in data_json['objects']:
+            if (
+                self.objects_interest is not None
+                and obj['class'] not in self.objects_interest
+            ):
                 continue
             # load the projected_cuboid_keypoints
             if obj['visibility'] == 1:
@@ -230,26 +226,22 @@ class CleanVisiiDopeLoader(data.Dataset):
                 projected_cuboid_keypoints = [[-100,-100],[-100,-100],[-100,-100],\
                     [-100,-100],[-100,-100],[-100,-100],[-100,-100],[-100,-100],[-100,-100]]
             all_projected_cuboid_keypoints.append(projected_cuboid_keypoints)
-        
-        if len(all_projected_cuboid_keypoints) == 0:
+
+        if not all_projected_cuboid_keypoints:
             all_projected_cuboid_keypoints = [[[-100,-100],[-100,-100],[-100,-100],\
                     [-100,-100],[-100,-100],[-100,-100],[-100,-100],[-100,-100],[-100,-100]]]
 
         # flatten the keypoints
         flatten_projected_cuboid = []
         for obj in all_projected_cuboid_keypoints: 
-            for p in obj:
-                flatten_projected_cuboid.append(p)
-
+            flatten_projected_cuboid.extend(iter(obj))
         #######
         if self.debug:
             img_to_save = Image.fromarray(img)
             draw = ImageDraw.Draw(img_to_save)
 
-            for ip,p in enumerate(flatten_projected_cuboid):
+            for p in flatten_projected_cuboid:
                 draw.ellipse((int(p[0])-2,int(p[1])-2,int(p[0])+2,int(p[1])+2),fill='green')
-                # draw.text((p[0]*2+4, p[1]*2+4),str(ip),'green',font=font)
-
             img_to_save.save(f"debug/{img_name.replace('.png','_original.png')}")
         #######
 
@@ -272,8 +264,8 @@ class CleanVisiiDopeLoader(data.Dataset):
 
         #######
 
-        # transform to the final output 
-        if not self.output_size == 400: 
+        # transform to the final output
+        if self.output_size != 400: 
             transform = A.Compose(
                 [
                     A.Resize(width=self.output_size, height=self.output_size),
@@ -296,10 +288,8 @@ class CleanVisiiDopeLoader(data.Dataset):
 
             draw = ImageDraw.Draw(img_transformed_saving)
 
-            for ip,p in enumerate(flatten_projected_cuboid_transformed):
+            for p in flatten_projected_cuboid_transformed:
                 draw.ellipse((int(p[0])-2,int(p[1])-2,int(p[0])+2,int(p[1])+2),fill='green')
-                # draw.text((p[0]*2+4, p[1]*2+4),str(ip),'green',font=font)
-
             img_transformed_saving.save(f"debug/{img_name.replace('.png','_transformed.png')}")
         #######
 
@@ -419,7 +409,7 @@ def VisualizeAffinityMap(
                 c = [0,0,0]
             for i_c in range(3):
                 images[i_image//2,i_c,i,j] = c[i_c]
-        if not points is None: 
+        if points is not None: 
             point = points[i_image//2]
             # print (images.shape)
             print (                
@@ -447,7 +437,7 @@ def VisualizeBeliefMap(
     # return len(keypoints)x3xwxh # stack of images in torch tensor
     ):
     images = torch.zeros(tensor.shape[0],3,tensor.shape[1],tensor.shape[2])
-    for i_image in range(0,tensor.shape[0]): #could be read as i_keypoint
+    for i_image in range(tensor.shape[0]): #could be read as i_keypoint
 
         belief = tensor[i_image].clone()
         belief -= float(torch.min(belief).item())

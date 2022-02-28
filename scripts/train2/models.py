@@ -65,10 +65,7 @@ class InvertedResidual(nn.Module):
         self.conv = nn.Sequential(*layers)
 
     def forward(self, x):
-        if self.use_res_connect:
-            return x + self.conv(x)
-        else:
-            return self.conv(x)
+        return x + self.conv(x) if self.use_res_connect else self.conv(x)
 
 class DopeMobileNet(nn.Module):
     def __init__(
@@ -113,10 +110,19 @@ class DopeMobileNet(nn.Module):
         # self.heads_0 = nn.Sequential()
 
         def build_block(inputs, outputs, nb_layers = 2 ):
-            layers = []
-            layers.append(InvertedResidual(inputs, 64, stride=1, expand_ratio=6, norm_layer=nn.BatchNorm2d))
-            for l in range(nb_layers-1):
-                layers.append(InvertedResidual(64, 64, stride=1, expand_ratio=6, norm_layer=nn.BatchNorm2d))        
+            layers = [
+                InvertedResidual(
+                    inputs, 64, stride=1, expand_ratio=6, norm_layer=nn.BatchNorm2d
+                )
+            ]
+
+            layers.extend(
+                InvertedResidual(
+                    64, 64, stride=1, expand_ratio=6, norm_layer=nn.BatchNorm2d
+                )
+                for _ in range(nb_layers - 1)
+            )
+
             layers.append(nn.Conv2d(64, outputs, kernel_size=3, stride=1, padding=1))
             # layers.append('4', nn.Conv2d(64, outputs, kernel_size=3, stride=1, padding=1))
             return nn.Sequential(*layers)
@@ -333,7 +339,7 @@ class BoundaryAwareNet(nn.Module):
         super(BoundaryAwareNet,self).__init__()
 
         self.dope = DopeNetwork()
-        if not pretrained_dope_path is None:
+        if pretrained_dope_path is not None:
             # print(pretrained_dope_path)
             # self.dope = torch.nn.DataParallel(self.dope)
             from collections import OrderedDict
@@ -349,7 +355,7 @@ class BoundaryAwareNet(nn.Module):
         vgg_full = models.vgg19(pretrained=True).features
 
         self.vgg = nn.Sequential()
-        for i_layer in range(0,len(vgg_full)):
+        for i_layer in range(len(vgg_full)):
             self.vgg.add_module(str(i_layer), vgg_full[i_layer])
 
         # input resampling
@@ -424,8 +430,10 @@ class DreamHourglassMultiStage(nn.Module):
 
         assert isinstance(n_stages, int), \
             "Expected \"n_stages\" to be an integer, but it is {}.".format(type(n_stages))
-        assert 0 < n_stages and n_stages <= 6, \
-            "DreamHourglassMultiStage can only be constructed with 1 to 6 stages at this time."
+        assert (
+            0 < n_stages <= 6
+        ), "DreamHourglassMultiStage can only be constructed with 1 to 6 stages at this time."
+
 
         self.num_stages = n_stages
 
@@ -791,11 +799,7 @@ class DreamHourglass(nn.Module):
             else:
                 decoder_input = torch.cat([x_0_5, joint_output.reshape(joint_output.shape[0],1,25,25)], dim=1)
         else:
-            if self.skip_connections:
-                decoder_input = x_0_5 + x_0_4_d
-            else:
-                decoder_input = x_0_5
-
+            decoder_input = x_0_5 + x_0_4_d if self.skip_connections else x_0_5
         # Decoder
         if self.deconv_decoder:
             y_0_5 = self.deconv_0_4(decoder_input)
@@ -849,9 +853,7 @@ class DreamHourglass(nn.Module):
             output_head_1 = self.heads_1(y_1_out)
 
         # Output heads
-        outputs = []
-        outputs.append(output_head_0)
-
+        outputs = [output_head_0]
         # Return outputs
         return output_head_0,output_head_1
 

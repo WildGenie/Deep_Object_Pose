@@ -245,10 +245,7 @@ class ModelData(object):
         '''Loads network model from disk with given path'''
         model_loading_start_time = time.time()
         print("Loading DOPE model '{}'...".format(path))
-        if self.architecture == 'dope':
-            net = DopeNetwork()
-        else:
-            net = ResnetSimple()
+        net = DopeNetwork() if self.architecture == 'dope' else ResnetSimple()
         net = torch.nn.DataParallel(net, [0]).cuda()
         net.load_state_dict(torch.load(path))
         net.eval()
@@ -388,17 +385,16 @@ class ObjectDetector(object):
         If given a mini-batch tensor, will save the tensor as a grid of images.
         """
         from PIL import Image
-        
+
         # tensor = tensor.cpu()
         grid = ObjectDetector.make_grid(tensor, nrow=nrow, padding=10,pad_value=1)
-        if not mean is None:
+        if mean is not None:
             # ndarr = grid.mul(std).add(mean).mul(255).byte().transpose(0,2).transpose(0,1).numpy()
             ndarr = grid.mul(std).add(mean).mul(255).byte().transpose(0,2).transpose(0,1).numpy()
         else:      
             ndarr = grid.mul(0.5).add(0.5).mul(255).byte().transpose(0,2).transpose(0,1).numpy()
-        im = Image.fromarray(ndarr)
         # im.save(filename)
-        return im
+        return Image.fromarray(ndarr)
 
     @staticmethod
     def detect_object_in_image(net_model, pnp_solver, in_img, config, 
@@ -422,47 +418,45 @@ class ObjectDetector(object):
         # Find objects from network output
         detected_objects = ObjectDetector.find_object_poses(vertex2, aff, pnp_solver, config)
 
-        if not grid_belief_debug: 
-
+        if not grid_belief_debug:
             return detected_objects, None
-        else:
-            # Run the belief maps debug display on the beliefmaps
-            
-            upsampling = nn.UpsamplingNearest2d(scale_factor=8)
-            tensor = vertex2
-            belief_imgs = []
-            in_img = (torch.tensor(in_img).float()/255.0)
-            in_img *= 0.7            
+        # Run the belief maps debug display on the beliefmaps
 
-            for j in range(tensor.size()[0]):
-                belief = tensor[j].clone()
-                if norm_belief:
-                    belief -= float(torch.min(belief)[0].data.cpu().numpy())
-                    belief /= float(torch.max(belief)[0].data.cpu().numpy())
+        upsampling = nn.UpsamplingNearest2d(scale_factor=8)
+        tensor = vertex2
+        belief_imgs = []
+        in_img = (torch.tensor(in_img).float()/255.0)
+        in_img *= 0.7            
 
-                # print (image_torch.size())
-                # raise()    
-                # belief *= 0.5
-                # print(in_img.size())
-                belief = upsampling(belief.unsqueeze(0).unsqueeze(0)).squeeze().squeeze().data 
-                belief = torch.clamp(belief,0,1).cpu()  
-                belief = torch.cat([
-                            belief.unsqueeze(0) + in_img[:,:,0],
-                            belief.unsqueeze(0) + in_img[:,:,1],
-                            belief.unsqueeze(0) + in_img[:,:,2]
-                            ]).unsqueeze(0)
-                belief = torch.clamp(belief,0,1) 
+        for j in range(tensor.size()[0]):
+            belief = tensor[j].clone()
+            if norm_belief:
+                belief -= float(torch.min(belief)[0].data.cpu().numpy())
+                belief /= float(torch.max(belief)[0].data.cpu().numpy())
 
-                # belief_imgs.append(belief.data.squeeze().cpu().numpy().transpose(1,2,0))
-                belief_imgs.append(belief.data.squeeze().numpy())
+            # print (image_torch.size())
+            # raise()    
+            # belief *= 0.5
+            # print(in_img.size())
+            belief = upsampling(belief.unsqueeze(0).unsqueeze(0)).squeeze().squeeze().data 
+            belief = torch.clamp(belief,0,1).cpu()  
+            belief = torch.cat([
+                        belief.unsqueeze(0) + in_img[:,:,0],
+                        belief.unsqueeze(0) + in_img[:,:,1],
+                        belief.unsqueeze(0) + in_img[:,:,2]
+                        ]).unsqueeze(0)
+            belief = torch.clamp(belief,0,1) 
 
-            # Create the image grid
-            belief_imgs = torch.tensor(np.array(belief_imgs))
+            # belief_imgs.append(belief.data.squeeze().cpu().numpy().transpose(1,2,0))
+            belief_imgs.append(belief.data.squeeze().numpy())
 
-            im_belief = ObjectDetector.get_image_grid(belief_imgs, None,
-                mean=0, std=1)
+        # Create the image grid
+        belief_imgs = torch.tensor(np.array(belief_imgs))
 
-            return detected_objects, im_belief
+        im_belief = ObjectDetector.get_image_grid(belief_imgs, None,
+            mean=0, std=1)
+
+        return detected_objects, im_belief
 
 
             
@@ -471,13 +465,13 @@ class ObjectDetector(object):
         '''Detect objects given network output'''
 
         # run_sampling = True
-        
+
         # Detect objects from belief maps and affinities
         objects, all_peaks = ObjectDetector.find_objects(vertex2, aff, config,
             run_sampling=run_sampling, num_sample=num_sample,scale_factor=scale_factor)
         detected_objects = []
         obj_name = pnp_solver.object_name
-        
+
         # print(all_peaks)
 
         #print("find_object_poses:  found {} objects ================".format(len(objects)))
@@ -495,7 +489,7 @@ class ObjectDetector(object):
                 for i_sample in range(num_sample):
                     sample = []
                     for i_point in range(len(obj[-1])):
-                        if not obj[-1][i_point][i_sample] is None:
+                        if obj[-1][i_point][i_sample] is not None:
                             sample.append( (obj[-1][i_point][i_sample][0]*scale_factor,
                                 obj[-1][i_point][i_sample][1]*scale_factor))
                         else:
@@ -514,9 +508,9 @@ class ObjectDetector(object):
                         qw.append(pnp_sample[1][3])
                     except:
                         pass
-                    # TODO
-                    # RUN quaternion as well for the std and avg. 
-                    
+                                # TODO
+                                # RUN quaternion as well for the std and avg. 
+
                 try:
                     print ("----")
                     print ("location:")
@@ -527,11 +521,11 @@ class ObjectDetector(object):
                     print (quaternion[0],quaternion[1],quaternion[2],quaternion[3])
                     print (np.mean(qx),np.mean(qy),np.mean(qz),np.mean(qw))
                     print (np.std(qx),np.std(qy),np.std(qz),np.std(qw))
-                
-                
+
+
                 except:
                     pass
-            if not location is None:
+            if location is not None:
                 detected_objects.append({
                     'name': obj_name,
                     'location': location,
@@ -542,9 +536,9 @@ class ObjectDetector(object):
                     'raw_points': points               
                 })
 
-            #print("find_object_poses:  points = ", type(points), points)
-            #print("find_object_poses:  locn = ", location, "quat =", quaternion)
-            #print("find_object_poses:  projected_points = ", type(projected_points), projected_points)
+                #print("find_object_poses:  points = ", type(points), points)
+                #print("find_object_poses:  locn = ", location, "quat =", quaternion)
+                #print("find_object_poses:  projected_points = ", type(projected_points), projected_points)
 
         return detected_objects
 

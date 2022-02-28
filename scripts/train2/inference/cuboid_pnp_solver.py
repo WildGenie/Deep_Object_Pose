@@ -22,7 +22,7 @@ class CuboidPNPSolver(object):
     def __init__(self, object_name="", camera_intrinsic_matrix = None, cuboid3d = None, 
             dist_coeffs = np.zeros((4, 1))):
         self.object_name = object_name
-        if (not camera_intrinsic_matrix is None):
+        if camera_intrinsic_matrix is not None:
             self._camera_intrinsic_matrix = camera_intrinsic_matrix
         else:
             self._camera_intrinsic_matrix = np.array([
@@ -31,7 +31,7 @@ class CuboidPNPSolver(object):
                 [0, 0, 0]
             ])
         self._cuboid3d = cuboid3d
-        
+
         # print (cuboid3d.get_vertices())
         # raise()
         self._dist_coeffs = dist_coeffs
@@ -64,7 +64,7 @@ class CuboidPNPSolver(object):
             # pnp_algorithm = 1
             pnp_algorithm = cv2.SOLVEPNP_EPNP 
 
-        
+
         location = None
         quaternion = None
         projected_points = cuboid2d_points
@@ -100,12 +100,12 @@ class CuboidPNPSolver(object):
             )
 
             if ret:
-                location = list(x[0] for x in tvec)
+                location = [x[0] for x in tvec]
                 quaternion = self.convert_rvec_to_quaternion(rvec)
-                
+
                 projected_points, _ = cv2.projectPoints(cuboid3d_points, rvec, tvec, self._camera_intrinsic_matrix, self._dist_coeffs)
                 projected_points = np.squeeze(projected_points)
-                
+
                 # If the location.Z is negative or object is behind the camera then flip both location and rotation
                 x, y, z = location
                 if z < 0:

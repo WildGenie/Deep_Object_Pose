@@ -47,7 +47,7 @@ for i in range(1,1100):
     # Get the total number of models to download
     if total_count <= 0 and 'X-Total-Count' in r.headers:
         total_count = int(r.headers['X-Total-Count'])
-    # Download each model 
+    # Download each model
     for model in models:
         # count+=1
         model_name = model['name']
@@ -56,11 +56,19 @@ for i in range(1,1100):
             count+=1
             print ('Downloading (%d/%d) %s' %    (count, total_count, model_name))
             download = requests.get(download_url+model_name+'.zip', stream=True)
-            with open("google_scanned_models/"+model_name+'.zip', 'wb') as fd:
+            with open(f"google_scanned_models/{model_name}.zip", 'wb') as fd:
                 for chunk in download.iter_content(chunk_size=1024*1024):
                     fd.write(chunk)
 
-        subprocess.call(['unzip',"google_scanned_models/"+model_name+'.zip','-d', "google_scanned_models/"+model_name])
-        subprocess.call(['rm',"google_scanned_models/"+model_name+'.zip'])
+        subprocess.call(
+            [
+                'unzip',
+                f"google_scanned_models/{model_name}.zip",
+                '-d',
+                "google_scanned_models/" + model_name,
+            ]
+        )
+
+        subprocess.call(['rm', f"google_scanned_models/{model_name}.zip"])
 
 

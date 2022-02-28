@@ -262,43 +262,42 @@ class ObjectDetector(object):
 
         if not make_belief_debug_img:
             return detected_objects, None
-        else:
-            # Run the belief maps debug display on the belief maps
-            tensor = vertex2
-            belief_imgs = []
+        # Run the belief maps debug display on the belief maps
+        tensor = vertex2
+        belief_imgs = []
+        if overlay_image:
+            upsampling = nn.UpsamplingNearest2d(size=in_img.shape[:2])
+            in_img = (torch.tensor(in_img).float() / 255.0)
+            in_img *= 0.5
+
+        for j in range(tensor.size()[0]):
+            belief = tensor[j].clone()
+            if norm_belief:
+                belief -= float(torch.min(belief).item())
+                belief /= float(torch.max(belief).item())
+
+            belief = torch.clamp(belief, 0, 1).cpu()
             if overlay_image:
-                upsampling = nn.UpsamplingNearest2d(size=in_img.shape[:2])
-                in_img = (torch.tensor(in_img).float() / 255.0)
-                in_img *= 0.5
+                belief = upsampling(belief.unsqueeze(0).unsqueeze(0)).squeeze().squeeze().data
+                belief = torch.cat([
+                    belief.unsqueeze(0) + in_img[:, :, 0],
+                    belief.unsqueeze(0) + in_img[:, :, 1],
+                    belief.unsqueeze(0) + in_img[:, :, 2]
+                ]).unsqueeze(0)
+                belief = torch.clamp(belief, 0, 1)
+            else:
+                belief = torch.cat([
+                    belief.unsqueeze(0),
+                    belief.unsqueeze(0),
+                    belief.unsqueeze(0)
+                ]).unsqueeze(0)
+            belief_imgs.append(belief.data.squeeze().numpy())
 
-            for j in range(tensor.size()[0]):
-                belief = tensor[j].clone()
-                if norm_belief:
-                    belief -= float(torch.min(belief).item())
-                    belief /= float(torch.max(belief).item())
+        # Create the image grid
+        belief_imgs = torch.tensor(np.array(belief_imgs))
+        im_belief = get_image_grid(belief_imgs, mean=0, std=1)
 
-                belief = torch.clamp(belief, 0, 1).cpu()
-                if overlay_image:
-                    belief = upsampling(belief.unsqueeze(0).unsqueeze(0)).squeeze().squeeze().data
-                    belief = torch.cat([
-                        belief.unsqueeze(0) + in_img[:, :, 0],
-                        belief.unsqueeze(0) + in_img[:, :, 1],
-                        belief.unsqueeze(0) + in_img[:, :, 2]
-                    ]).unsqueeze(0)
-                    belief = torch.clamp(belief, 0, 1)
-                else:
-                    belief = torch.cat([
-                        belief.unsqueeze(0),
-                        belief.unsqueeze(0),
-                        belief.unsqueeze(0)
-                    ]).unsqueeze(0)
-                belief_imgs.append(belief.data.squeeze().numpy())
-
-            # Create the image grid
-            belief_imgs = torch.tensor(np.array(belief_imgs))
-            im_belief = get_image_grid(belief_imgs, mean=0, std=1)
-
-            return detected_objects, im_belief
+        return detected_objects, im_belief
 
     @staticmethod
     def find_object_poses(vertex2, aff, pnp_solver, config):
