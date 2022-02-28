@@ -22,7 +22,7 @@ class CuboidPNPSolver(object):
     def __init__(self, object_name="", camera_intrinsic_matrix = None, cuboid3d = None,
             dist_coeffs = np.zeros((4, 1))):
         self.object_name = object_name
-        if (not camera_intrinsic_matrix is None):
+        if camera_intrinsic_matrix is not None:
             self._camera_intrinsic_matrix = camera_intrinsic_matrix
         else:
             self._camera_intrinsic_matrix = np.array([
@@ -110,7 +110,7 @@ class CuboidPNPSolver(object):
                 ret = False
 
             if ret:
-                location = list(x[0] for x in tvec)
+                location = [x[0] for x in tvec]
                 quaternion = self.convert_rvec_to_quaternion(rvec)
 
                 projected_points, _ = cv2.projectPoints(cuboid3d_points, rvec, tvec, self._camera_intrinsic_matrix, self._dist_coeffs)

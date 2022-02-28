@@ -203,13 +203,13 @@ class DopeNode(object):
             # print('---')
             # continue
             # Publish pose and overlay cube on image
-            for i_r, result in enumerate(results):
+            for result in results:
                 if result["location"] is None:
                     continue
                 # print(result)
                 loc = result["location"]
                 ori = result["quaternion"]
-                
+
                 print(loc)
 
                 dict_out['objects'].append({
@@ -232,9 +232,7 @@ class DopeNode(object):
 
                 # Draw the cube
                 if None not in result['projected_points']:
-                    points2d = []
-                    for pair in result['projected_points']:
-                        points2d.append(tuple(pair))
+                    points2d = [tuple(pair) for pair in result['projected_points']]
                     draw.draw_cube(points2d, self.draw_colors[m])
         # save the output of the image. 
         im.save(f"{output_folder}/{img_name}.png")
@@ -256,8 +254,8 @@ def rotate_vector(vector, quaternion):
 if __name__ == "__main__":
 
     import argparse
-    import yaml 
-    import glob 
+    import yaml
+    import glob
     import os 
 
     parser = argparse.ArgumentParser()
@@ -294,7 +292,7 @@ if __name__ == "__main__":
         config = yaml.load(f, Loader=yaml.FullLoader)
     with open(opt.camera) as f:
         camera_info = yaml.load(f, Loader=yaml.FullLoader)
-    
+
     # setup the realsense
     if opt.realsense:
         import pyrealsense2 as rs
@@ -325,14 +323,13 @@ if __name__ == "__main__":
     imgs = []
     imgsname = []
 
-    if not opt.data is None:
+    if opt.data is not None:
         videopath = opt.data
-        for j in sorted(glob.glob(videopath+"/*.png")):
+        for j in sorted(glob.glob(f'{videopath}/*.png')):
             imgs.append(j)
             imgsname.append(j.replace(videopath,"").replace("/",""))
-    else:
-        if not opt.realsense:
-            cap = cv2.VideoCapture(0)
+    elif not opt.realsense:
+        cap = cv2.VideoCapture(0)
 
     # An object to run dope node
     dope_node = DopeNode(config)
@@ -343,7 +340,7 @@ if __name__ == "__main__":
 
     while True:
         i_image+=1
-        
+
         # Capture frame-by-frame
 
         if not opt.data:
@@ -358,13 +355,13 @@ if __name__ == "__main__":
         else:
             if i_image >= len(imgs):
                 i_image =0
-                
+
             frame = cv2.imread(imgs[i_image])
             print(f"frame {imgsname[i_image]}")
             img_name = imgsname[i_image]
 
         frame = frame[...,::-1].copy()
-        
+
         # call the inference node
         dope_node.image_callback(
             frame, 

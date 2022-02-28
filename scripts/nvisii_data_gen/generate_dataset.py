@@ -1,10 +1,10 @@
-import random 
+import random
 import subprocess
 
 
 # 20 000 images
 
-for i in range(0,40):
+for i in range(40):
 	to_call = [
 		# "python",'single_video.py',
 		"python",'single_video_pybullet.py',

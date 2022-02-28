@@ -286,31 +286,30 @@ def loadjson(path, objectsofinterest, img):
 
     for i_line in range(len(data['objects'])):
         info = data['objects'][i_line]
-        if not objectsofinterest is None and \
-           not objectsofinterest in info['class'].lower():
+        if (
+            objectsofinterest is not None
+            and objectsofinterest not in info['class'].lower()
+        ):
             continue 
-        
-        box = info['bounding_box']
-        boxToAdd = []
 
-        boxToAdd.append(float(box['top_left'][0]))
-        boxToAdd.append(float(box['top_left'][1]))
-        boxToAdd.append(float(box["bottom_right"][0]))
-        boxToAdd.append(float(box['bottom_right'][1]))
+        box = info['bounding_box']
+        boxToAdd = [
+            float(box['top_left'][0]),
+            float(box['top_left'][1]),
+            float(box["bottom_right"][0]),
+            float(box['bottom_right'][1]),
+        ]
+
+
         boxes.append(boxToAdd)
 
         boxpoint = [(boxToAdd[0],boxToAdd[1]),(boxToAdd[0],boxToAdd[3]),
                     (boxToAdd[2],boxToAdd[1]),(boxToAdd[2],boxToAdd[3])]
 
         pointsBoxes.append(boxpoint)
-        
-        # 3dbbox with belief maps
-        points3d = []
-        
-        pointdata = info['projected_cuboid']
-        for p in pointdata:
-            points3d.append((p[0],p[1]))
 
+        pointdata = info['projected_cuboid']
+        points3d = [(p[0],p[1]) for p in pointdata]
         # Get the centroids
         pcenter = info['projected_cuboid_centroid']
 
@@ -344,11 +343,11 @@ def loadimages(root):
     imgs = []
 
     def add_json_files(path,):
-        for imgpath in glob.glob(path+"/*.png"):
+        for imgpath in glob.glob(f'{path}/*.png'):
             if exists(imgpath) and exists(imgpath.replace('png',"json")):
                 imgs.append((imgpath,imgpath.replace(path,"").replace("/",""),
                     imgpath.replace('png',"json")))
-        for imgpath in glob.glob(path+"/*.jpg"):
+        for imgpath in glob.glob(f'{path}/*.jpg'):
             if exists(imgpath) and exists(imgpath.replace('jpg',"json")):
                 imgs.append((imgpath,imgpath.replace(path,"").replace("/",""),
                     imgpath.replace('jpg',"json")))
@@ -356,9 +355,11 @@ def loadimages(root):
     def explore(path):
         if not os.path.isdir(path):
             return
-        folders = [os.path.join(path, o) for o in os.listdir(path) 
-                        if os.path.isdir(os.path.join(path,o))]
-        if len(folders)>0:
+        if folders := [
+            os.path.join(path, o)
+            for o in os.listdir(path)
+            if os.path.isdir(os.path.join(path, o))
+        ]:
             for path_entry in folders:                
                 explore(path_entry)
         else:
@@ -409,9 +410,9 @@ class MultipleVertexJson(data.Dataset):
             '''Recursively load the data.  This is useful to load all of the FAT dataset.'''
             imgs = loadimages(path)
 
-            # Check all the folders in path 
+            # Check all the folders in path
             for name in os.listdir(str(path)):
-                imgs += loadimages(path +"/"+name)
+                imgs += loadimages(f'{path}/{name}')
             return imgs
 
 
@@ -422,10 +423,7 @@ class MultipleVertexJson(data.Dataset):
 
     def __len__(self):
         # When limiting the number of data
-        if not self.data_size is None:
-            return int(self.data_size)
-
-        return len(self.imgs)   
+        return int(self.data_size) if self.data_size is not None else len(self.imgs)   
 
     def __getitem__(self, index):
         """
@@ -513,7 +511,7 @@ class MultipleVertexJson(data.Dataset):
             new_cuboid = np.matmul(
                 rmat, np.vstack((proj_cuboid.T, np.ones(len(points)))))
             new_cuboid = np.matmul(tmat, new_cuboid)
-            new_cuboid = new_cuboid[0:2].T
+            new_cuboid = new_cuboid[:2].T
 
             return new_cuboid
 
@@ -564,11 +562,11 @@ class MultipleVertexJson(data.Dataset):
                     DrawDot(key,(12, 115, 170),7) 
                                        
             def DrawLine(point1, point2, lineColor, lineWidth):
-                if not point1 is None and not point2 is None:
+                if point1 is not None and point2 is not None:
                     draw.line([point1,point2],fill=lineColor,width=lineWidth)
 
             def DrawDot(point, pointColor, pointRadius):
-                if not point is None:
+                if point is not None:
                     xy = [point[0]-pointRadius, point[1]-pointRadius, point[0]+pointRadius, point[1]+pointRadius]
                     draw.ellipse(xy, fill=pointColor, outline=pointColor)
 
@@ -578,12 +576,8 @@ class MultipleVertexJson(data.Dataset):
                 lineColor1 = (255, 215, 0)  # yellow-ish
                 lineColor2 = (12, 115, 170)  # blue-ish
                 lineColor3 = (45, 195, 35)  # green-ish
-                if which_color == 3:
-                    lineColor = lineColor3
-                else:
-                    lineColor = lineColor1
-
-                if not color is None:
+                lineColor = lineColor3 if which_color == 3 else lineColor1
+                if color is not None:
                     lineColor = color        
 
                 # draw front
@@ -591,13 +585,13 @@ class MultipleVertexJson(data.Dataset):
                 DrawLine(points[1], points[2], lineColor, lineWidthForDrawing)
                 DrawLine(points[3], points[2], lineColor, lineWidthForDrawing)
                 DrawLine(points[3], points[0], lineColor, lineWidthForDrawing)
-                
+
                 # draw back
                 DrawLine(points[4], points[5], lineColor, lineWidthForDrawing)
                 DrawLine(points[6], points[5], lineColor, lineWidthForDrawing)
                 DrawLine(points[6], points[7], lineColor, lineWidthForDrawing)
                 DrawLine(points[4], points[7], lineColor, lineWidthForDrawing)
-                
+
                 # draw sides
                 DrawLine(points[0], points[4], lineColor, lineWidthForDrawing)
                 DrawLine(points[7], points[3], lineColor, lineWidthForDrawing)
@@ -721,10 +715,7 @@ def inner_angle(v,w):
 def py_ang(A, B=(1,0)):
     inner=inner_angle(A,B)
     det = determinant(A,B)
-    if det<0: #this is a property of the det. If the det < 0 then B is clockwise of A
-        return inner
-    else: # if the det > 0 then A is immediately clockwise of B
-        return 360-inner
+    return inner if det<0 else 360-inner
 
 def GenerateMapAffinity(img,nb_vertex,pointsInterest,objects_centroid,scale):
     """
@@ -746,10 +737,11 @@ def GenerateMapAffinity(img,nb_vertex,pointsInterest,objects_centroid,scale):
     # Create the empty tensors
     totensor = transforms.Compose([transforms.ToTensor()])
 
-    affinities = []
-    for i_points in range(nb_vertex):
-        affinities.append(torch.zeros(2,int(img.size[1]/scale),int(img.size[0]/scale)))
-    
+    affinities = [
+        torch.zeros(2, int(img.size[1] / scale), int(img.size[0] / scale))
+        for _ in range(nb_vertex)
+    ]
+
     for i_pointsImage in range(len(pointsInterest)):    
         pointsImage = pointsInterest[i_pointsImage]
         center = objects_centroid[i_pointsImage]
@@ -766,7 +758,7 @@ def GenerateMapAffinity(img,nb_vertex,pointsInterest,objects_centroid,scale):
 
             # Normalizing
             v = affinities[i_points].numpy()                    
-            
+
             xvec = v[0]
             yvec = v[1]
 
@@ -801,8 +793,8 @@ def getAfinityCenter(width, height, point, center, radius=7, img_affinity=None):
     # Create the canvas for the afinity output
     imgAffinity = Image.new("RGB", (width,height), "black")
     totensor = transforms.Compose([transforms.ToTensor()])
-    
-    draw = ImageDraw.Draw(imgAffinity)    
+
+    draw = ImageDraw.Draw(imgAffinity)
     r1 = radius
     p = point
     draw.ellipse((p[0]-r1,p[1]-r1,p[0]+r1,p[1]+r1),(255,255,255))
@@ -817,16 +809,13 @@ def getAfinityCenter(width, height, point, center, radius=7, img_affinity=None):
     affinity = np.concatenate([[array*angle_vector[0]],[array*angle_vector[1]]])
 
     # print (tensor)
-    if not img_affinity is None:
+    if img_affinity is not None:
         # Find the angle vector
         # print (angle_vector)
-        if length(angle_vector) >0:
-            angle=py_ang(angle_vector)
-        else:
-            angle = 0
+        angle = py_ang(angle_vector) if length(angle_vector) >0 else 0
         # print(angle)
         c = np.array(colorsys.hsv_to_rgb(angle/360,1,1)) * 255
-        draw = ImageDraw.Draw(img_affinity)    
+        draw = ImageDraw.Draw(img_affinity)
         draw.ellipse((p[0]-r1,p[1]-r1,p[0]+r1,p[1]+r1),fill=(int(c[0]),int(c[1]),int(c[2])))
         del draw
     re = torch.from_numpy(affinity).float() + tensor
@@ -933,10 +922,10 @@ def save_image(tensor, filename, nrow=4, padding=2,mean=None, std=None):
     If given a mini-batch tensor, will save the tensor as a grid of images.
     """
     from PIL import Image
-    
+
     tensor = tensor.cpu()
     grid = make_grid(tensor, nrow=nrow, padding=10,pad_value=1)
-    if not mean is None:
+    if mean is not None:
         ndarr = grid.mul(std).add(mean).mul(255).byte().transpose(0,2).transpose(0,1).numpy()
     else:      
         ndarr = grid.mul(0.5).add(0.5).mul(255).byte().transpose(0,2).transpose(0,1).numpy()
@@ -944,11 +933,11 @@ def save_image(tensor, filename, nrow=4, padding=2,mean=None, std=None):
     im.save(filename)
 
 def DrawLine(point1, point2, lineColor, lineWidth,draw):
-    if not point1 is None and not point2 is None:
+    if point1 is not None and point2 is not None:
         draw.line([point1,point2],fill=lineColor,width=lineWidth)
 
 def DrawDot(point, pointColor, pointRadius, draw):
-    if not point is None:
+    if point is not None:
         xy = [point[0]-pointRadius, point[1]-pointRadius, point[0]+pointRadius, point[1]+pointRadius]
         draw.ellipse(xy, fill=pointColor, outline=pointColor)
 
@@ -959,12 +948,8 @@ def DrawCube(points, which_color = 0, color = None, draw = None):
     lineColor1 = (255, 215, 0)  # yellow-ish
     lineColor2 = (12, 115, 170)  # blue-ish
     lineColor3 = (45, 195, 35)  # green-ish
-    if which_color == 3:
-        lineColor = lineColor3
-    else:
-        lineColor = lineColor1
-
-    if not color is None:
+    lineColor = lineColor3 if which_color == 3 else lineColor1
+    if color is not None:
         lineColor = color        
 
     # draw front
@@ -972,13 +957,13 @@ def DrawCube(points, which_color = 0, color = None, draw = None):
     DrawLine(points[1], points[2], lineColor, lineWidthForDrawing, draw)
     DrawLine(points[3], points[2], lineColor, lineWidthForDrawing, draw)
     DrawLine(points[3], points[0], lineColor, lineWidthForDrawing, draw)
-    
+
     # draw back
     DrawLine(points[4], points[5], lineColor, lineWidthForDrawing, draw)
     DrawLine(points[6], points[5], lineColor, lineWidthForDrawing, draw)
     DrawLine(points[6], points[7], lineColor, lineWidthForDrawing, draw)
     DrawLine(points[4], points[7], lineColor, lineWidthForDrawing, draw)
-    
+
     # draw sides
     DrawLine(points[0], points[4], lineColor, lineWidthForDrawing, draw)
     DrawLine(points[7], points[3], lineColor, lineWidthForDrawing, draw)
